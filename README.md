@@ -24,17 +24,18 @@ Fonte de conteúdo          Template HTML/CSS         PDF final
 ```
 criador-de-ppts/
 ├── exemplos/
-│   ├── portfolio-audiovisual/   ← portfólio A4 landscape, 10 páginas, imagens locais e remotas
-│   │   └── gerar.js
-│   └── proposta-comercial/      ← proposta com capa navegável e links internos no PDF
+│   ├── portfolio-audiovisual/
+│   │   ├── gerar.js          ← A4 Landscape (297×210mm) — para impressão, apresentação, e-mail
+│   │   └── gerar-mobile.js   ← Mobile (430×760px) — para WhatsApp, DMs, links diretos
+│   └── proposta-comercial/
 │       ├── gerar.js
 │       ├── template.html
 │       └── capa-navegacao.html
 └── utils/
-    ├── capturar-html.js         ← captura o HTML completo de qualquer URL
-    ├── extrair-css.js           ← extrai o CSS aplicado de uma página
-    ├── gerar-pdf-url.js         ← gera PDF direto de uma URL
-    └── debug-screenshot.js      ← screenshot para depurar o layout
+    ├── capturar-html.js      ← captura o HTML completo de qualquer URL
+    ├── extrair-css.js        ← extrai o CSS aplicado de uma página
+    ├── gerar-pdf-url.js      ← gera PDF direto de uma URL
+    └── debug-screenshot.js   ← screenshot para depurar o layout
 ```
 
 ---
@@ -50,14 +51,24 @@ npm install
 
 ## Exemplos incluídos
 
-### Portfólio Audiovisual (`exemplos/portfolio-audiovisual/`)
+### Portfólio Audiovisual — duas versões de canal
+
+O mesmo conteúdo, dois formatos — cada um otimizado para o canal onde o cliente vai receber:
+
+| Versão | Formato | Canal | Script |
+|---|---|---|---|
+| Horizontal | A4 Landscape (297×210mm) | E-mail, reunião, impressão | `gerar.js` |
+| Mobile | 430×760px por página | WhatsApp, DMs, links diretos | `gerar-mobile.js` |
+
+Ambas carregam os mesmos assets (imagens remotas via CDN + stills locais), aplicam o mesmo design system e geram um PDF standalone — sem dependências externas.
+
+#### Versão Horizontal — A4 Landscape
 
 PDF A4 Landscape, 10 páginas, com:
 - Imagens remotas (via CDN) e locais (stills de vídeo)
 - Design system completo: tipografia, paleta, grid
 - Todas as imagens embutidas como base64 (PDF standalone, sem dependências)
 
-**Como rodar:**
 ```bash
 node exemplos/portfolio-audiovisual/gerar.js
 # Saída: portfolio-comp.pdf
@@ -71,6 +82,29 @@ node exemplos/portfolio-audiovisual/gerar.js
 
 ---
 
+#### Versão Mobile — 430×760px
+
+PDF mobile-first, 10 páginas, com:
+- Layout em coluna única, tipografia ampliada, grids 3-4 colunas adaptados
+- Imagens com `aspect-ratio` fixo (4:5, 3:4) para nunca distorcer
+- Backgrounds full-bleed com gradiente direcional (conteúdo visível no topo, texto no rodapé)
+- Links internos funcionais em cada card — sets individuais, reels e highlights
+- CTAs por página com links reais de demonstração
+- Design system idêntico ao horizontal: mesma paleta, mesma tipografia
+
+```bash
+node exemplos/portfolio-audiovisual/gerar-mobile.js
+# Saída: portfolio-mobile.pdf
+```
+
+**Como adaptar:**
+1. Edite `IMGS` com suas URLs remotas
+2. Ajuste os caminhos de stills locais no início do bloco `async`
+3. Atualize os `href` dos CTAs e cards com seus links reais
+4. Modifique `buildHTML(assets)` — cada `<!-- ░░ P0X ░░ -->` é uma página independente
+
+---
+
 ### Proposta Comercial (`exemplos/proposta-comercial/`)
 
 PDF mobile-first (430×932px), com:
@@ -78,7 +112,6 @@ PDF mobile-first (430×932px), com:
 - 3 páginas de proposta em abas (Pista Externa, Pista Coletivos, Pacote Completo)
 - Fontes Google e design system dark
 
-**Como rodar:**
 ```bash
 node exemplos/proposta-comercial/gerar.js
 # Saída: proposta-pista-livre.pdf
@@ -125,7 +158,7 @@ node utils/debug-screenshot.js
 
 ---
 
-## Como criar um novo tipo de documento
+## Como criar um novo documento
 
 ### 1. De um site existente
 
@@ -154,7 +187,13 @@ node utils/gerar-pdf-url.js ./captura.html
 Copie um dos exemplos como base:
 
 ```bash
+# Para um documento horizontal (A4, relatório, portfólio):
 cp -r exemplos/portfolio-audiovisual exemplos/meu-projeto
+# Use gerar.js como ponto de partida
+
+# Para um documento mobile (WhatsApp, DM, link):
+cp -r exemplos/portfolio-audiovisual exemplos/meu-projeto
+# Use gerar-mobile.js como ponto de partida
 ```
 
 Estrutura mínima de um gerador:
@@ -164,7 +203,6 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
 
-// 1. Monte o HTML com seus dados
 const html = `
 <!DOCTYPE html>
 <html>
@@ -172,8 +210,10 @@ const html = `
   <style>
     /* A4 Landscape */
     .pag { width: 297mm; height: 210mm; overflow: hidden; page-break-after: always; }
-    /* A4 Retrato */
-    /* .pag { width: 210mm; height: 297mm; } */
+
+    /* Mobile (430×760px) */
+    /* .pag { width: 430px; height: 760px; overflow: hidden; page-break-after: always; } */
+
     @media print { body { -webkit-print-color-adjust: exact; } }
   </style>
 </head>
@@ -183,7 +223,6 @@ const html = `
 </body>
 </html>`;
 
-// 2. Salva HTML temporário e gera PDF
 (async () => {
   const tmp = path.join(__dirname, '_tmp.html');
   fs.writeFileSync(tmp, html);
@@ -192,19 +231,45 @@ const html = `
   const page = await browser.newPage();
   await page.goto('file:///' + tmp.replace(/\\/g, '/'), { waitUntil: 'networkidle0' });
 
+  // A4 Landscape
   await page.pdf({
     path: 'saida.pdf',
     format: 'A4',
-    landscape: true,          // false para retrato
+    landscape: true,
     printBackground: true,
     margin: { top: 0, right: 0, bottom: 0, left: 0 },
   });
+
+  // Mobile (430×760px) — use este em vez do anterior
+  // await page.pdf({
+  //   path: 'saida-mobile.pdf',
+  //   width: '430px',
+  //   height: '760px',
+  //   printBackground: true,
+  //   margin: { top: 0, right: 0, bottom: 0, left: 0 },
+  // });
 
   await browser.close();
   fs.unlinkSync(tmp);
   console.log('PDF gerado: saida.pdf');
 })();
 ```
+
+---
+
+## Estratégia multi-canal
+
+O mesmo documento pode — e deve — ter versões para cada canal:
+
+| Canal | Formato recomendado | Como gerar |
+|---|---|---|
+| E-mail / reunião | A4 Landscape | `page.pdf({ format: 'A4', landscape: true })` |
+| WhatsApp / DMs | 430×760px | `page.pdf({ width: '430px', height: '760px' })` |
+| Apresentação (tela 16:9) | 1280×720px | `page.pdf({ width: '1280px', height: '720px' })` |
+| Impressão A4 retrato | A4 | `page.pdf({ format: 'A4', landscape: false })` |
+| Stories (9:16) | 1080×1920px | `page.pdf({ width: '1080px', height: '1920px' })` |
+
+O design system (cores, tipografia, lógica de conteúdo) permanece o mesmo — só o layout e o `width/height` do PDF mudam.
 
 ---
 
@@ -235,5 +300,6 @@ const html = `
 
 ## Exemplos de resultado
 
-- `portfolio-comp.pdf` — portfólio audiovisual StudioComp, A4 Landscape, 10 páginas
+- `portfolio-comp.pdf` — portfólio StudioComp, A4 Landscape, 10 páginas
+- `portfolio-mobile.pdf` — portfólio StudioComp, Mobile 430×760px, 10 páginas
 - `proposta-pista-livre.pdf` — proposta Festival Pista Livre, mobile-first, com navegação interna
