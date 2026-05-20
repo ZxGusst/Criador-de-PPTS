@@ -1,0 +1,16 @@
+{
+  "name": "criador-de-ppts",
+  "version": "1.0.0",
+  "description": "Gerador de PDFs e apresentações a partir de qualquer fonte de conteúdo",
+  "type": "commonjs",
+  "scripts": {
+    "portfolio": "node exemplos/portfolio-audiovisual/gerar.js",
+    "proposta": "node exemplos/proposta-comercial/gerar.js"
+  },
+  "keywords": ["pdf", "puppeteer", "portfolio", "proposta", "apresentacao"],
+  "license": "MIT",
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "puppeteer": "^24.42.0"
+  }
+}
